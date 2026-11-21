@@ -50,14 +50,14 @@
 
     function encode(m) {
         return [
-            m.type,
-            m.id,
-            m.a || '-',
-            m.b === undefined || m.b === null || m.b === '' ? '-' : String(m.b),
-            m.flags || '-',
-            m.loc || '-',
-            String(m.ttl),
-            m.path || '',
+        m.type,
+        m.id,
+        m.a || '-',
+        m.b === undefined || m.b === null || m.b === '' ? '-' : String(m.b),
+        m.flags || '-',
+        m.loc || '-',
+        String(m.ttl),
+        m.path || '',
         ].join('|');
     }
 
@@ -98,93 +98,98 @@
 
     class MeshNode {
         constructor(opts) {
-        this.id = opts.id;                 // this phone's 3-character ID
-        this.isRescue = !!opts.isRescue;   // rescue post handles SOS instead of relaying
-        this.seenTtlMs = opts.seenTtlMs || SEEN_TTL_MS;
-        this.seen = new Map();             // key -> last time seen
-        this.pending = new Map();          // key -> relay waiting to be sent
-        this.counter = opts.counter || 0;
+            this.id = opts.id;                 // this phone's 3-character ID
+            this.isRescue = !!opts.isRescue;   // rescue post handles SOS instead of relaying
+            this.seenTtlMs = opts.seenTtlMs || SEEN_TTL_MS;
+            this.seen = new Map();             // key -> last time seen
+            this.pending = new Map();          // key -> relay waiting to be sent
+            this.counter = opts.counter || 0;
         }
 
         nextId() {
-        this.counter = (this.counter % 99) + 1;
-        return this.id + String(this.counter).padStart(2, '0');
+            this.counter = (this.counter % 99) + 1;
+            return this.id + String(this.counter).padStart(2, '0');
         }
 
         isSeen(key, now) {
-        const t = this.seen.get(key);
-        if (t === undefined) return false;
-        if (now - t > this.seenTtlMs) {
-            this.seen.delete(key);
-            return false;
-        }
-        return true;
+            const t = this.seen.get(key);
+            if (t === undefined) return false;
+            if (now - t > this.seenTtlMs) {
+                this.seen.delete(key);
+                return false;
+            }
+            return true;
         }
 
         // Call whenever this device sends its own message (first send or a repeat).
         noteSent(msg, now) {
-        this.seen.set(keyOf(msg), now);
+            this.seen.set(keyOf(msg), now);
         }
 
         // Decide what to do with a decoded chirp.
         handleHeard(text, now, rand) {
-        rand = rand || Math.random;
-        const msg = decode(text);
-        if (!msg) return { events: ['invalid'], msg: null, relay: null };
-        const key = keyOf(msg);
-        const events = [];
-        const mine = !this.isRescue && originOf(msg) === this.id;
+            rand = rand || Math.random;
+            const msg = decode(text);
+            if (!msg) return { events: ['invalid'], msg: null, relay: null };
+            const key = keyOf(msg);
+            const events = [];
+            const mine = !this.isRescue && originOf(msg) === this.id;
 
-        if (this.isSeen(key, now)) {
-            this.seen.set(key, now);
-            events.push('duplicate');
-            // A phone at the same distance (or farther) already passed it on, so this
-            // phone doesn't need to. A copy from closer to the sender doesn't count:
-            // it's behind us, and cancelling would break the chain.
-            const waiting = this.pending.get(key);
-            if (waiting) {
-            this.pending.delete(key);
-            events.push('cancelRelay');
+            if (this.isSeen(key, now)) {
+                this.seen.set(key, now);
+                events.push('duplicate');
+                // A phone at the same distance (or farther) already passed it on, so this
+                // phone doesn't need to. A copy from closer to the sender doesn't count:
+                // it's behind us, and cancelling would break the chain.
+                const waiting = this.pending.get(key);
+
+                if (waiting && msg.path.length >= waiting.msg.path.length) {
+                    this.pending.delete(key);
+                    events.push('cancelRelay');
+                }
+
+                if (mine && msg.type !== 'R' && msg.path.length > 0) events.push('neighborRelayedMine');
+                if (this.isRescue && msg.type === 'S') events.push('sosRepeat');
+
+                return { events, msg, key, relay: null };
             }
-            if (mine && msg.type !== 'R' && msg.path.length > 0) events.push('neighborRelayedMine');
-            if (this.isRescue && msg.type === 'S') events.push('sosRepeat');
-            return { events, msg, key, relay: null };
-        }
 
-        this.seen.set(key, now);
+            this.seen.set(key, now);
 
-        if (this.isRescue) {
-            if (msg.type === 'S') events.push('sos');
-            else if (msg.type === 'K') events.push('safe');
-            else events.push('ignored');
-            return { events, msg, key, relay: null };
-        }
+            if (this.isRescue) {
+                if (msg.type === 'S') events.push('sos');
+                else if (msg.type === 'K') events.push('safe');
+                else events.push('ignored');
+                
+                return { events, msg, key, relay: null };
+            }
 
-        if (mine) {
-            if (msg.type === 'R') events.push('reply');
-            else if (msg.path.length > 0) events.push('neighborRelayedMine');
-            else events.push('ownEcho');
-            return { events, msg, key, relay: null };
-        }
+            if (mine) {
+                if (msg.type === 'R') events.push('reply');
+                else if (msg.path.length > 0) events.push('neighborRelayedMine');
+                else events.push('ownEcho');
+                
+                return { events, msg, key, relay: null };
+            }
 
-        if (msg.ttl <= 0) {
-            events.push('ttlExpired');
-            return { events, msg, key, relay: null };
-        }
+            if (msg.ttl <= 0) {
+                events.push('ttlExpired');
+                return { events, msg, key, relay: null };
+            }
 
-        const out = Object.assign({}, msg, { ttl: msg.ttl - 1, path: msg.path + this.id });
-        const delayMs = 500 + Math.floor(rand() * 2500);
-        const relay = { key, text: encode(out), msg: out, delayMs };
-        this.pending.set(key, relay);
-        events.push('relayScheduled');
-        return { events, msg, key, relay };
+            const out = Object.assign({}, msg, { ttl: msg.ttl - 1, path: msg.path + this.id });
+            const delayMs = 500 + Math.floor(rand() * 2500);
+            const relay = { key, text: encode(out), msg: out, delayMs };
+            this.pending.set(key, relay);
+            events.push('relayScheduled');
+            return { events, msg, key, relay };
         }
 
         // Called when a relay's wait ends. Returns false if it was cancelled.
         takePending(key) {
-        if (!this.pending.has(key)) return false;
-        this.pending.delete(key);
-        return true;
+            if (!this.pending.has(key)) return false;
+            this.pending.delete(key);
+            return true;
         }
     }
 
