@@ -96,6 +96,21 @@
         return hops.length ? hops[hops.length - 1] : originOf(msg);
     }
 
+    function urgencyScore(msg, firstHeardMs, nowMs) {
+        if (!msg || msg.type !== 'S') return 0;
+        let s = (PROBLEMS[msg.a] || PROBLEMS.X).score;
+        const flags = msg.flags && msg.flags !== '-' ? msg.flags : '';
+        for (const c of flags) if (FLAGS[c]) s += FLAGS[c].score;
+        const people = parseInt(msg.b, 10);
+        if (!isNaN(people)) s += people * 5;
+        if (firstHeardMs && nowMs) s += Math.floor((nowMs - firstHeardMs) / 60000);
+        return s;
+    }
+
+
+    // One device in the mesh. The app feeds it every decoded chirp through handleHeard(),
+    // and it answers with events plus, sometimes, a relay to send.
+
     class MeshNode {
         constructor(opts) {
             this.id = opts.id;                 // this phone's 3-character ID
@@ -187,14 +202,14 @@
 
         // Called when a relay's wait ends. Returns false if it was cancelled.
         takePending(key) {
-            if (!this.pending.has(key)) return false;
-            this.pending.delete(key);
-            return true;
+        if (!this.pending.has(key)) return false;
+        this.pending.delete(key);
+        return true;
         }
     }
 
     const api = {
-        DEFAULT_TTL, PROBLEMS, FLAGS, REPLIES, ID_CHARS, ID_LEN, encode, decode, keyOf, originOf, hopsOf, lastHopOf, randomId, MeshNode,
+        DEFAULT_TTL, PROBLEMS, FLAGS, REPLIES, ID_CHARS, ID_LEN, encode, decode, keyOf, originOf, hopsOf, lastHopOf, randomId, urgencyScore, MeshNode,
     };
 
     if (typeof module === 'object' && module.exports) module.exports = api;
