@@ -1,5 +1,5 @@
 // Saves every app file on first visit so LIFELINE opens and runs in airplane mode.
-const CACHE = 'lifeline-v36';
+const CACHE = 'lifeline-v38';
 const FILES = [
   './',
   'index.html',
@@ -39,7 +39,15 @@ self.addEventListener('fetch', (event) => {
     }))));
     return;
   }
+  // Network first: whenever there is a connection the newest files are used (and saved);
+  // with no connection the saved copy runs, so it still works offline.
   event.respondWith(
-    caches.match(event.request, { ignoreSearch: true }).then((hit) => hit || fetch(event.request))
+    fetch(event.request, { cache: 'no-cache' }).then((res) => {
+      if (res.ok && new URL(event.request.url).origin === self.location.origin) {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(event.request, copy));
+      }
+      return res;
+    }).catch(() => caches.match(event.request, { ignoreSearch: true }))
   );
 });

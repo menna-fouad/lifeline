@@ -75,8 +75,10 @@
         <label class="field" for="rng-volume"><span>Chirp volume</span><small id="lbl-volume"></small></label>
         <input type="range" id="rng-volume" min="5" max="80" step="5">
         <label class="toggle"><input type="checkbox" id="chk-3d"><span>3D scene in Home Watch</span></label>
+        <label class="toggle"><input type="checkbox" id="chk-twice"><span>Play each chirp twice (more reliable, a bit longer)</span></label>
         <label class="toggle"><input type="checkbox" id="chk-chime"><span>Chime before each chirp, ping when a request arrives</span></label>
         <button type="button" id="btn-soundcheck" class="btn btn-quiet">Send a sound check</button>
+        <p class="ver">Version 38</p>
       </details>
 
       <button type="button" id="btn-setup-done" class="btn btn-ink">Save</button>
@@ -212,6 +214,7 @@
     </div>
   </div>
 
+  <button type="button" id="btn-again" class="again" hidden>Send again</button>
   <script src="vendor/ggwave.js"></script>
   <script src="src/mesh.js"></script>
   <script src="src/sound.js"></script>

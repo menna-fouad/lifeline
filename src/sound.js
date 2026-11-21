@@ -233,11 +233,16 @@
           const proto = this.gg.ProtocolId[(PROTOCOLS[S.protocol] || PROTOCOLS.DT_FASTEST).id];
           const waveform = this.gg.encode(this.tx, text, proto, S.volume);
           const samples = convertTypedArray(new Int8Array(waveform), Float32Array);
-          // Half a second of silence first: laptop and Bluetooth speakers wake up slowly and
-          // swallow the start of a chirp, which is the part the listener needs to lock on to.
-          const lead = Math.round(this.ctx.sampleRate * 0.5), tail = Math.round(this.ctx.sampleRate * 0.15);
-          const buf = this.ctx.createBuffer(1, lead + samples.length + tail, this.ctx.sampleRate);
-          buf.getChannelData(0).set(samples, lead);
+          // Half a second of silence first: laptop and Bluetooth speakers wake up slowly and swallow
+          // the start of a chirp. The message is then played twice in one go: a listener that missed
+          // the first copy usually catches the second, and the repeat is ignored if both arrive.
+          const sr = this.ctx.sampleRate;
+          const lead = Math.round(sr * 0.5), gap = Math.round(sr * 0.45), tail = Math.round(sr * 0.15);
+          const times = S.twice === false ? 1 : 2;
+          const buf = this.ctx.createBuffer(1, lead + samples.length * times + (times - 1) * gap + tail, sr);
+          const ch = buf.getChannelData(0);
+          ch.set(samples, lead);
+          if (times === 2) ch.set(samples, lead + samples.length + gap);
           await this._play(buf);
         } finally {
           this.transmitting = false;

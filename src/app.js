@@ -22,6 +22,7 @@
     protocol: 'DT_FAST',
     volume: 30,
     chime: true,
+    twice: true,
     scene3d: true,
     household: { people: 0, flags: '' },
     counter: 0,
@@ -232,6 +233,7 @@
   // Sending and relaying
   // ------------------------------------------------------------------
   // On-screen log of every chirp this device sends (TX) and decodes (RX), for testing.
+  let lastTx = '';
   const dbgLines = [];
   function dbg(kind, text) {
     const el = document.getElementById('txlog'); if (!el) return;
@@ -1065,6 +1067,7 @@
     $('#rng-volume').value = S.volume;
     $('#lbl-volume').textContent = `${S.volume} of 80`;
     $('#chk-chime').checked = S.chime;
+    $('#chk-twice').checked = S.twice !== false;
     $('#chk-3d').checked = S.scene3d !== false;
     setRole(S.role);
   }
@@ -1078,6 +1081,7 @@
     S.protocol = $('#sel-protocol').value;
     S.volume = parseInt($('#rng-volume').value, 10);
     S.chime = $('#chk-chime').checked;
+    S.twice = $('#chk-twice').checked;
     S.scene3d = $('#chk-3d').checked;
     const picked = $('#setup-people button.on');
     S.household = {
@@ -1160,6 +1164,8 @@
       else if (window.LifelineWatch) window.LifelineWatch.open();
     };
     $('#btn-safe').onclick = imSafe;
+    // Last resort for a lost chirp: play this device's last message again.
+    $('#btn-again').onclick = () => { if (lastTx) { Sound.send(lastTx); toast('Sending the last message again'); } };
     if (window.LifelineWatch) window.LifelineWatch.init({
       sendSos, sendAnswer: answerUntilRelayed, imSafe, toast, vibrate,
       ping: () => Sound.ping(), hasSos: () => !!state.sos, replyText, use3d: () => S.scene3d !== false,
@@ -1192,7 +1198,7 @@
         await Sound.start();
         Sound.onDecoded = onDecoded;
         let txStart = 0;
-        Sound.onTxStart = (t) => { dbg('TX', t); txStart = performance.now(); document.body.classList.add('tx'); setStatus('Sending'); };
+        Sound.onTxStart = (t) => { lastTx = t; $('#btn-again').hidden = false; dbg('TX', t); txStart = performance.now(); document.body.classList.add('tx'); setStatus('Sending'); };
         Sound.onTxEnd = (text) => {
           document.body.classList.remove('tx');
           setStatus('Listening');
@@ -1237,7 +1243,11 @@
     });
 
     if ('serviceWorker' in navigator && window.isSecureContext) {
+      const hadController = !!navigator.serviceWorker.controller;
       navigator.serviceWorker.register('sw.js').catch(() => {});
+      // A newer version took over: reload once so this device is never left running an old one.
+      let reloaded = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController && !reloaded) { reloaded = true; location.reload(); } });
     }
   }
 
