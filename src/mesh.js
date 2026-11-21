@@ -11,7 +11,7 @@
     *   TTL    hops left before phones stop passing it on (0 to 9)
     *   PATH   the phones that already relayed it, 3 characters each, in order
     *
- */
+*/
 (function (root) {
     'use strict';
 
@@ -94,6 +94,21 @@
     function lastHopOf(msg) {
         const hops = hopsOf(msg);
         return hops.length ? hops[hops.length - 1] : originOf(msg);
+    }
+
+    // Does this phone have a household profile worth sending?
+    function hasProfile(profile) {
+        return !!(profile && parseInt(profile.people, 10) >= 1);
+    }
+
+    // A saved household turned into the B and FLAGS fields of an SOS to speed up sending it out
+    function sosFromProfile(profile) {
+        const p = profile || {};
+        let people = parseInt(p.people, 10);
+        if (!(people >= 1)) people = 1;
+        if (people > 5) people = 5;
+        const flags = String(p.flags || '').split('').filter((c) => FLAGS[c]).join('') || '-';
+        return { b: String(people), flags };
     }
 
     function urgencyScore(msg, firstHeardMs, nowMs) {
@@ -209,7 +224,7 @@
     }
 
     const api = {
-        DEFAULT_TTL, PROBLEMS, FLAGS, REPLIES, ID_CHARS, ID_LEN, encode, decode, keyOf, originOf, hopsOf, lastHopOf, randomId, urgencyScore, MeshNode,
+        DEFAULT_TTL, PROBLEMS, FLAGS, REPLIES, ID_CHARS, ID_LEN, encode, decode, keyOf, originOf, hopsOf, lastHopOf, randomId, hasProfile, sosFromProfile, urgencyScore, MeshNode,
     };
 
     if (typeof module === 'object' && module.exports) module.exports = api;
