@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Lifeline">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="preload" href="assets/fonts/instrument-sans.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles/style.css">
+  <title>Lifeline</title>
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="mark" viewBox="0 0 32 32">
+      <rect width="32" height="32" rx="8" fill="#1a1f29"/>
+      <path d="M4.5 17H10l2.4-5 2.6 10 3-14 2.6 12 1.4-3h1.8" fill="none" stroke="#fff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="26.6" cy="17" r="2.3" fill="#e0342b"/>
+    </symbol>
+  </svg>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+  <!-- Start -->
+  <section id="screen-start" class="screen active">
+    <div class="start">
+      <div class="brand big"><svg class="mark" aria-hidden="true"><use href="#mark"/></svg><h1 class="wordmark">Lifeline</h1></div>
+      <svg class="start-line" viewBox="0 0 600 80" preserveAspectRatio="none" aria-hidden="true">
+        <path d="M0 40 H220 L232 40 L240 18 L250 62 L260 10 L270 70 L280 26 L288 40 H600"/>
+      </svg>
+      <p class="lede">SOS by sound, when there's no signal.</p>
+      <button id="btn-start" class="btn btn-ink">Start listening</button>
+      <p id="start-error" class="error" hidden></p>
+    </div>
+  </section>
+
+  <!-- Setup -->
+  <section id="screen-setup" class="screen">
+    <div class="setup">
+      <h2 class="title">Set up this device</h2>
+
+      <fieldset class="choice" id="seg-role">
+        <legend>Use this device as</legend>
+        <button type="button" data-value="phone"><span class="choice-name">A phone</span><span class="choice-desc">Send an SOS and pass on other people's messages</span></button>
+        <button type="button" data-value="rescue"><span class="choice-name">A rescue post</span><span class="choice-desc">Receive SOS messages and reply, on a laptop</span></button>
+      </fieldset>
+
+      <div id="phone-only" class="setup-rows">
+        <div class="setup-row">
+          <div><span class="setup-label">Your phone ID</span><span id="setup-id" class="setup-id"></span></div>
+          <button type="button" id="btn-new-id" class="btn-small">New ID</button>
+        </div>
+        <div class="setup-stack">
+          <span class="setup-label">Who lives here</span>
+          <div class="numbers" id="setup-people" role="radiogroup" aria-label="How many people live here"></div>
+          <div class="options" id="setup-flags"></div>
+          <p class="note">Sent with every SOS, so you never type it during an emergency.</p>
+        </div>
+      </div>
+      <div class="setup-rows">
+        <div class="setup-row">
+          <div><span class="setup-label">Location</span><div id="setup-loc" class="setup-loc"></div></div>
+          <button type="button" id="btn-allow-loc" class="btn-small">Allow location</button>
+        </div>
+      </div>
+
+      <details class="more">
+        <summary>Sound</summary>
+        <label class="field" for="sel-protocol"><span>Chirp style</span></label>
+        <select id="sel-protocol"></select>
+        <label class="field" for="rng-volume"><span>Chirp volume</span><small id="lbl-volume"></small></label>
+        <input type="range" id="rng-volume" min="5" max="80" step="5">
+        <label class="toggle"><input type="checkbox" id="chk-3d"><span>3D scene in Home Watch</span></label>
+        <label class="toggle"><input type="checkbox" id="chk-chime"><span>Chime before each chirp, ping when a request arrives</span></label>
+        <button type="button" id="btn-soundcheck" class="btn btn-quiet">Send a sound check</button>
+      </details>
+
+      <button type="button" id="btn-setup-done" class="btn btn-ink">Save</button>
+    </div>
+  </section>
+
+  <!-- Phone -->
+  <section id="screen-phone" class="screen">
+    <header class="bar">
+      <span class="brand"><svg class="mark" aria-hidden="true"><use href="#mark"/></svg><span class="wordmark small">Lifeline</span></span>
+      <button type="button" class="icon-btn" data-open-setup aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
+    </header>
+    <canvas id="line-phone" class="lifeline" height="64" aria-hidden="true"></canvas>
+    <div class="chips">
+      <span class="chip"><span class="chip-k">ID</span><span id="chip-id-text"></span></span>
+      <button type="button" class="chip" id="chip-loc"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 15s5-4.6 5-8.5A5 5 0 0 0 3 6.5C3 10.4 8 15 8 15z"/><circle cx="8" cy="6.5" r="1.7"/></svg><span class="chip-text">Location not shared yet</span></button>
+    </div>
+
+    <main id="phone-home" class="phone">
+      <div class="radar">
+        <svg class="rings" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="40"/></svg>
+        <span class="pulse" aria-hidden="true"></span>
+        <span class="pulse two" aria-hidden="true"></span>
+        <div id="radar-dots" class="radar-dots" aria-label="Phones heard nearby"></div>
+        <button type="button" id="btn-sos" class="sos" aria-label="Open Home Watch">
+          <svg class="hold-ring" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46"/></svg>
+          <span class="sos-word sos-watch">Watch</span>
+          <span class="sos-hint" id="sos-hint">Tap to open</span>
+        </button>
+      </div>
+      <div id="carrying" class="carrying" hidden>
+        <div>
+          <p id="carry-text" class="carry-text"></p>
+          <p id="carry-sub" class="carry-sub"></p>
+        </div>
+        <button type="button" id="btn-carry-now" class="btn-small">Send now</button>
+      </div>
+      <div class="stats">
+        <div><b id="stat-relayed">0</b><span>Messages passed on</span></div>
+        <div><b id="stat-post" class="small-stat">Not yet</b><span>Rescue post heard</span></div>
+      </div>
+      <section class="relays">
+        <h3 class="list-title">Messages you passed on</h3>
+        <ul id="phone-log" class="rows"><li class="placeholder">Nothing yet. When a nearby phone sends an SOS, this phone passes it on automatically.</li></ul>
+      </section>
+    </main>
+
+    <main id="phone-flow" class="phone" hidden>
+      <h2 class="question">What's happening?</h2>
+      <div class="options tight" id="choices-problem" role="radiogroup" aria-label="What's happening"></div>
+      <h3 class="flow-label">How many people need help?</h3>
+      <div class="numbers" id="choices-people" role="radiogroup" aria-label="How many people"></div>
+      <h3 class="flow-label">Anyone with you?</h3>
+      <div class="numbers three" id="choices-flags"></div>
+      <button type="button" id="btn-send-sos" class="btn btn-red" disabled>Send SOS</button>
+      <button type="button" id="btn-flow-cancel" class="link center">Cancel</button>
+    </main>
+
+    <main id="phone-tracker" class="phone" hidden>
+      <h2 id="tracker-head" class="headline">Your SOS is being sent</h2>
+      <p id="tracker-summary" class="summary"></p>
+      <p id="tracker-loc" class="loc-line"></p>
+      <ol class="progress">
+        <li id="trk-chirp"><span class="node"></span><span class="label">Sent from this phone</span></li>
+        <li id="trk-heard"><span class="node"></span><span class="label">Passed on by a nearby phone</span></li>
+        <li id="trk-rescue"><span class="node"></span><span class="label">Received by rescuers</span></li>
+      </ol>
+      <p id="tracker-reply" class="reply" hidden></p>
+      <p id="tracker-retry" class="note"></p>
+      <button type="button" id="btn-safe" class="btn btn-quiet">I'm safe now</button>
+    </main>
+  </section>
+
+  <!-- Rescue post -->
+  <section id="screen-rescue" class="screen">
+    <header class="bar rescue-bar">
+      <span class="brand"><svg class="mark" aria-hidden="true"><use href="#mark"/></svg><span class="wordmark small">Lifeline</span></span>
+      <span class="bar-meta">Rescue post</span>
+
+      <button type="button" class="icon-btn" data-open-setup aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg></button>
+    </header>
+    <main class="console">
+      <section class="net">
+        <div id="radar" class="radar-map">
+          <div class="rd-sweep" aria-hidden="true"></div>
+          <svg id="radar-svg" viewBox="0 0 800 800" aria-hidden="true"></svg>
+          <div class="rd-center" aria-hidden="true"><span class="rd-core"><svg viewBox="0 0 32 32"><path d="M4.5 17H10l2.4-5 2.6 10 3-14 2.6 12 1.4-3h1.8"/><circle cx="26.6" cy="17" r="2.3"/></svg></span><b>You</b></div>
+          <div id="radar-pins" class="rd-pins" aria-label="Open requests by direction and distance"></div>
+          <p id="radar-empty" class="rd-empty">Listening for SOS messages</p>
+        </div>
+      </section>
+      <aside class="requests">
+        <h2 class="list-title">Requests <span id="req-count"></span></h2>
+        <p id="post-empty" class="empty-note">Nothing yet. Each SOS shows up here with the phones it passed through.</p>
+        <ol id="queue" class="rows"></ol>
+      </aside>
+    </main>
+  </section>
+
+  <!-- Home Watch: the flood simulator -->
+  <div id="watch-game" class="game" hidden>
+    <canvas id="game-canvas" aria-label="A house in a flood"></canvas>
+    <div id="game-edge" class="game-edge" aria-hidden="true"></div>
+    <header class="game-top">
+      <button type="button" id="g-close" class="g-round" aria-label="Close Home Watch"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="g-clock"><b id="g-time">5:00 PM</b></div>
+      <div class="g-chips" id="g-chips"></div>
+    </header>
+    <div id="g-feed" class="g-feed" aria-live="polite"></div>
+    <aside class="g-gauge" aria-label="Water level">
+      <div class="g-track"><i id="g-fill"></i><span class="g-mark" id="g-mark-up">Upper</span><span class="g-mark" id="g-mark-ground">Ground</span><em id="g-you"></em></div>
+      <b id="g-depth">Dry</b>
+    </aside>
+    <section class="g-sheet">
+      <div class="g-state"><span id="g-pill" class="pill">Watching</span><span id="g-rate" class="g-rate"></span></div>
+      <h2 id="g-line" class="g-line">Watching your home.</h2>
+      <ol id="g-chain" class="g-chain" hidden>
+        <li id="gc-sent"><i></i>Sent</li><li id="gc-relay"><i></i>Passed on</li><li id="gc-post"><i></i>Heard by rescuers</li>
+      </ol>
+      <div id="g-chat" class="g-chat" hidden></div>
+      <div class="g-actions">
+        <button type="button" id="g-start" class="btn btn-ink">Simulate flood</button>
+      </div>
+    </section>
+    <div id="watch-alert" class="watch-alert" role="alertdialog" aria-labelledby="watch-alert-title" hidden>
+      <div class="watch-alert-box">
+        <svg class="watch-ring-svg" viewBox="0 0 100 100" aria-hidden="true"><circle class="bg" cx="50" cy="50" r="46"/><circle id="watch-ring" cx="50" cy="50" r="46"/></svg>
+        <span id="watch-count" class="watch-count">10</span>
+      </div>
+      <h2 id="watch-alert-title" class="headline">Sending an SOS</h2>
+      <p id="watch-alert-reason" class="summary"></p>
+      <button type="button" id="watch-cancel" class="btn btn-ink">I'm OK, cancel</button>
+    </div>
+  </div>
+
+  <script src="vendor/ggwave.js"></script>
+  <script src="src/mesh.js"></script>
+  <script src="src/sound.js"></script>
+  <script src="src/watch.js"></script>
+  <script src="src/app.js"></script>
+</body>
+</html>

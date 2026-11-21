@@ -1,0 +1,2 @@
+ggwave (https://github.com/ggerganov/ggwave) is MIT licensed, Copyright (c) 2021 Georgi Gerganov.
+Used here for data-over-sound encoding and decoding.
